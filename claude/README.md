@@ -15,6 +15,13 @@ For a portable project configuration, set `CUTPILOT_ROOT` to this directory and 
 
 ## Claude Desktop
 
-Open the supplied `cutpilot-v4.2.mcpb` file with Claude Desktop, review the local file/tool permissions, and install it. Current releases call this format MCPB; the supplied `.dxt` file contains the same compatible bundle for older Desktop versions.
+Run:
+
+```sh
+chmod +x claude/install-claude-desktop.sh
+./claude/install-claude-desktop.sh
+```
+
+The installer backs up any existing Claude Desktop configuration, preserves its other MCP servers, and adds CutPilot using absolute local paths. Restart Claude Desktop after it finishes.
 
 After installation, ask Claude to list CutPilot project starters or create a blank CutPilot project. Use the returned localhost review URL in a browser for manual timeline editing.

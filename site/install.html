@@ -5,7 +5,7 @@ xcode-select --install</code></div></section>
 cd cutpilot
 npm install
 npm run validate</code></div><p class="notice">仓库目前公开可见，但尚未授予开源复用许可证。请勿在未获授权时重新分发代码。</p></section>
-<section id="connect"><h2>连接你的 AI 主机</h2><div class="choice-grid"><a class="choice" href="#codex"><b>Codex</b><span>添加本地 MCP 服务</span></a><a class="choice" href="#claude-code"><b>Claude Code</b><span>运行随附安装脚本</span></a><a class="choice" href="#claude-desktop"><b>Claude Desktop</b><span>打开 MCPB 安装包</span></a></div><section id="codex"><h3>Codex</h3><p>把仓库内的 <code>codex.mcp.json</code> 作为配置参考，并将路径替换为本机 CutPilot 的绝对路径：</p><div class="code-block"><button class="copy" data-copy>复制</button><code>{
+<section id="connect"><h2>连接你的 AI 主机</h2><div class="choice-grid"><a class="choice" href="#codex"><b>Codex</b><span>添加本地 MCP 服务</span></a><a class="choice" href="#claude-code"><b>Claude Code</b><span>运行随附安装脚本</span></a><a class="choice" href="#claude-desktop"><b>Claude Desktop</b><span>运行安全配置脚本</span></a></div><section id="codex"><h3>Codex</h3><p>把仓库内的 <code>codex.mcp.json</code> 作为配置参考，并将路径替换为本机 CutPilot 的绝对路径：</p><div class="code-block"><button class="copy" data-copy>复制</button><code>{
   "mcpServers": {
     "cutpilot": {
       "command": "node",
@@ -13,6 +13,7 @@ npm run validate</code></div><p class="notice">仓库目前公开可见，但尚
     }
   }
 }</code></div></section><section id="claude-code"><h3>Claude Code</h3><div class="code-block"><button class="copy" data-copy>复制</button><code>chmod +x claude/install-claude-code.sh
-./claude/install-claude-code.sh</code></div></section><section id="claude-desktop"><h3>Claude Desktop</h3><p>在 Finder 中打开仓库附带的 <code>cutpilot-v4.2.mcpb</code>，检查本地文件与工具权限后安装。旧版 Desktop 可以使用兼容的 <code>.dxt</code> 文件。</p></section></section>
+./claude/install-claude-code.sh</code></div></section><section id="claude-desktop"><h3>Claude Desktop</h3><p>脚本会备份现有配置，保留其他 MCP 服务，再加入 CutPilot。完成后重新启动 Claude Desktop。</p><div class="code-block"><button class="copy" data-copy>复制</button><code>chmod +x claude/install-claude-desktop.sh
+./claude/install-claude-desktop.sh</code></div></section></section>
 <section id="verify"><h2>确认安装成功</h2><p>在 AI 对话中输入：</p><div class="code-block"><button class="copy" data-copy>复制</button><code>请列出 CutPilot 支持的项目模板，然后运行运行环境检查。不要修改任何文件。</code></div><p>看到项目模板与 FFmpeg、Chrome 等检查结果后，就可以告诉 AI 素材文件夹和目标视频类型。需要手工调整时，让 AI 打开本地 review 界面。</p></section>
 <section id="providers"><h2>独立模型与生成服务</h2><p>CutPilot 的本地剪辑能力不需要付费模型密钥。视频、音乐、音效和远程转录服务需要你自己的供应商账号、端点和计费。</p><p class="notice">不要把 API 密钥写进 GitHub、项目文件或聊天消息。通过 AI 主机的秘密管理或本机环境变量配置。开放式自然语言创作目前仍需要 Codex、Claude 或其他 MCP-compatible AI 主机。</p></section></div></div></main><footer class="shell footer"><div class="brand"><img src="/cutpilot-logo.svg" alt=""><span>CUTPILOT<small>LOW BATTERY STUDIO</small></span></div><nav><a href="/privacy.html">隐私</a><a href="/changelog.html">更新</a></nav><small>© 2026 Low Battery Studio</small></footer><script src="/site.js" defer></script></body></html>

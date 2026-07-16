@@ -7,6 +7,7 @@ for (const file of ["styles.css", "install.html", "privacy.html", "changelog.htm
 assert.doesNotMatch(html, /[—–]/, "Landing page must not contain em/en dashes");
 assert.match(html, /application\/ld\+json/);
 assert.match(readFileSync("site/install.html", "utf8"), /Claude Desktop/);
+assert.ok(existsSync("claude/install-claude-desktop.sh"));
 
 const legacyResponse = await onRequest({
   request: new Request("https://cutpilot.pages.dev/docs?from=legacy"),
