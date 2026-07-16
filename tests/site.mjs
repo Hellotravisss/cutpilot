@@ -6,6 +6,8 @@ assert.match(html, /CutPilot/); assert.match(html, /Low Battery Studio/); assert
 for (const file of ["styles.css", "install.html", "privacy.html", "changelog.html", "404.html", "site.js", "cutpilot-logo.png", "robots.txt", "sitemap.xml"]) assert.ok(existsSync(`site/${file}`), `Missing site/${file}`);
 assert.doesNotMatch(html, /[—–]/, "Landing page must not contain em/en dashes");
 assert.match(html, /application\/ld\+json/);
+assert.match(readFileSync("site/styles.css", "utf8"), /prefers-color-scheme:dark/);
+assert.match(html, /theme-color" content="#101114" media="\(prefers-color-scheme: dark\)"/);
 assert.match(readFileSync("site/install.html", "utf8"), /Claude Desktop/);
 assert.ok(existsSync("claude/install-claude-desktop.sh"));
 
