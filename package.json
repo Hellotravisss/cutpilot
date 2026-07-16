@@ -1,0 +1,23 @@
+{
+  "name": "cutpilot-ai-editor",
+  "version": "9.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node --check scripts/server.mjs && node tests/runtime-readiness.mjs && node tests/capabilities.mjs",
+    "test:core": "node tests/asset-intelligence.mjs && node tests/natural-language-edit.mjs && node tests/generation-providers.mjs && node tests/capcut-handoff.mjs && node tests/glsl-batch.mjs && node tests/remotion-project.mjs && node tests/mcp-smoke.mjs",
+    "test:browser": "node tests/intelligence-natural-ui.mjs && node tests/director-panels-ui.mjs && node tests/delivery-pack-ui.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "@remotion/bundler": "^4.0.489",
+    "@remotion/renderer": "^4.0.489",
+    "esbuild": "^0.25.12",
+    "fast-xml-parser": "^5.7.0",
+    "puppeteer-core": "^25.3.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.489",
+    "zod": "^3.25.76"
+  }
+}

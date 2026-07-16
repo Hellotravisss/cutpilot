@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { newProject } from "../scripts/project-store.mjs";
+import { analyzeAssetBeats, applyBeatMontage, buildBeatMontagePlan, detectBeatsFromEnvelope, saveBeatMarkers } from "../scripts/beat-edit-engine.mjs";
+
+const root = mkdtempSync(join(tmpdir(), "mycut-beats-")), audio = join(root, "clicks.wav");
+const made = spawnSync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc=if(lt(mod(t\\,0.5)\\,0.025)\\,0.95*sin(2*PI*900*t)\\,0):s=48000:d=4", audio], { encoding: "utf8" });
+assert.equal(made.status, 0, made.stderr);
+const project = newProject({ name: "Beat edit", width: 1280, height: 720, fps: 30 });
+project.assets.push({ id: "music", name: "Click track", path: audio, type: "audio", duration: 4 }, { id: "red", name: "Red", path: join(root, "red.mp4"), type: "video", duration: 3, subclips: [{ id: "red-a", name: "Red A", sourceStart: 0, sourceEnd: 1.5 }] }, { id: "blue", name: "Blue", path: join(root, "blue.mp4"), type: "video", duration: 3 });
+const analysis = analyzeAssetBeats(project.assets[0], { sensitivity: .7, minInterval: .3 });
+assert.ok(analysis.beats.length >= 7 && analysis.beats.length <= 9, `unexpected beats: ${analysis.beats.map((beat) => beat.time)}`);
+assert.ok(Math.abs(analysis.bpm - 120) < 2, `unexpected bpm: ${analysis.bpm}`);
+for (let index = 1; index < analysis.beats.length; index++) assert.ok(analysis.beats[index].time > analysis.beats[index - 1].time);
+const saved = saveBeatMarkers(project, "music", analysis, { replace: true }); assert.equal(saved.markers.length, analysis.beats.length); assert.equal(project.timelines[0].markers.every((marker) => marker.kind === "beat" && marker.assetId === "music"), true);
+saveBeatMarkers(project, "music", analysis, { replace: true, accentsOnly: true }); assert.equal(project.timelines[0].markers.length, analysis.beats.filter((beat) => beat.accent).length);
+const beatTimes = analysis.beats.map((beat) => beat.time), plan = buildBeatMontagePlan(project, { beatTimes, assetIds: ["red", "blue"], start: beatTimes[0], end: beatTimes.at(-1), cutEvery: 1 });
+assert.equal(plan.nonMutating, true); assert.equal(project.timelines[0].tracks[0].items.length, 0); assert.ok(plan.clips.length >= 5); assert.deepEqual(plan.clips.slice(0, 3).map((clip) => clip.assetId), ["red", "blue", "red"]);
+const applied = applyBeatMontage(project, { plan, trackIdOrName: "V1" }); assert.equal(applied.items.length, plan.clips.length); assert.equal(applied.validation.valid, true);
+assert.throws(() => buildBeatMontagePlan(project, { beatTimes: [0], assetIds: ["red"] }), /interval/); assert.throws(() => detectBeatsFromEnvelope([0, 1], .1), /too short/);
+console.log(JSON.stringify({ ok: true, bpm: analysis.bpm, beats: analysis.beats.map((beat) => beat.time), markers: saved.markers.length, montageClips: applied.items.length }, null, 2));

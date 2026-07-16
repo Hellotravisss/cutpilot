@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, statSync, utimesSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { applyTimelineEdit, newProject, saveProject } from "../scripts/project-store.mjs";
+import { renderProject } from "../scripts/media-engine.mjs";
+import { detachVideoProxy, generateVideoProxy, proxyStatus, resolvePreviewMedia, scanProxyStatus } from "../scripts/proxy-media-engine.mjs";
+
+const root = mkdtempSync(join(tmpdir(), "mycut-proxy-")), source = join(root, "source.mp4"), projectPath = join(root, "proxy.mycut.json"), output = join(root, "final.mp4"); const made = spawnSync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=1920x1080:r=24:d=2", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", source], { encoding: "utf8" }); assert.equal(made.status, 0, made.stderr);
+const project = newProject({ name: "Proxy", width: 1920, height: 1080, fps: 24 }), asset = { id: "source", name: "4K-ish source", path: source, type: "video", duration: 2, width: 1920, height: 1080, fps: "24/1", hasAudio: true }; project.assets.push(asset); saveProject(projectPath, project);
+const generated = generateVideoProxy(projectPath, asset, { profile: "540p", quality: 26, includeAudio: true }); assert.equal(generated.status, "ready"); assert.equal(generated.proxy.media.height, 540); assert.equal(generated.proxy.media.width, 960); assert.equal(generated.proxy.media.hasAudio, true); assert.equal(proxyStatus(asset).status, "ready"); assert.equal(resolvePreviewMedia(asset).usingProxy, true); assert.equal(scanProxyStatus(project).ready, 1);
+const stat = statSync(source); utimesSync(source, stat.atime, new Date(stat.mtimeMs + 5000)); assert.equal(proxyStatus(asset).status, "stale"); assert.equal(resolvePreviewMedia(asset).usingProxy, false); const regenerated = generateVideoProxy(projectPath, asset, { profile: "720p", quality: 24 }); assert.equal(regenerated.proxy.media.height, 720); assert.equal(proxyStatus(asset).status, "ready");
+applyTimelineEdit(project, { trackName: "V1", adds: [{ assetId: asset.id, start: 0, sourceStart: 0, duration: 2 }] }); const proxyPath = asset.proxy.path; rmSync(proxyPath); assert.equal(proxyStatus(asset).status, "missing"); renderProject(project, output, { crf: 28 }); const finalProbe = JSON.parse(spawnSync("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "json", output], { encoding: "utf8" }).stdout); assert.deepEqual([finalProbe.streams[0].width, finalProbe.streams[0].height], [1920, 1080]);
+const detached = detachVideoProxy(projectPath, asset, { deleteFile: true }); assert.equal(detached.detached, true); assert.equal(asset.proxy, undefined); assert.equal(scanProxyStatus(project).none, 1);
+console.log(JSON.stringify({ ok: true, generated: { dimensions: [generated.proxy.media.width, generated.proxy.media.height], compressionRatio: generated.compressionRatio }, regenerated: { dimensions: [regenerated.proxy.media.width, regenerated.proxy.media.height] }, final: [1920, 1080], detached }, null, 2));

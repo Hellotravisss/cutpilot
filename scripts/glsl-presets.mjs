@@ -1,0 +1,8 @@
+const header = `precision mediump float;uniform sampler2D u_texture;uniform float u_time;uniform float u_progress;uniform vec2 u_resolution;varying vec2 v_texCoord;`;
+export const GLSL_PRESETS = {
+  "chromatic-pulse": { name: "Chromatic Pulse", uniforms: { amount: 0.012, speed: 5 }, source: `${header}uniform float amount;uniform float speed;void main(){float a=amount*(0.5+0.5*sin(u_time*speed));vec2 d=vec2(a,0.0);float r=texture2D(u_texture,v_texCoord+d).r;float g=texture2D(u_texture,v_texCoord).g;float b=texture2D(u_texture,v_texCoord-d).b;gl_FragColor=vec4(r,g,b,1.0);}` },
+  "film-grain": { name: "Film Grain", uniforms: { amount: 0.12, vignette: 0.5 }, source: `${header}uniform float amount;uniform float vignette;float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+u_time*19.0)*43758.5453);}void main(){vec4 c=texture2D(u_texture,v_texCoord);float n=(hash(gl_FragCoord.xy)-0.5)*amount;float v=1.0-vignette*smoothstep(0.25,0.72,distance(v_texCoord,vec2(0.5)));gl_FragColor=vec4((c.rgb+n)*v,c.a);}` },
+  "heat-wave": { name: "Heat Wave", uniforms: { amplitude: 0.012, frequency: 28, speed: 4 }, source: `${header}uniform float amplitude;uniform float frequency;uniform float speed;void main(){vec2 uv=v_texCoord;uv.x+=sin(uv.y*frequency+u_time*speed)*amplitude;gl_FragColor=texture2D(u_texture,uv);}` },
+  "pixel-reveal": { name: "Pixel Reveal", uniforms: { maxPixels: 48 }, source: `${header}uniform float maxPixels;void main(){float cells=mix(maxPixels,300.0,u_progress);vec2 uv=floor(v_texCoord*cells)/cells;gl_FragColor=texture2D(u_texture,uv);}` },
+};
+export const listGlslPresets = () => Object.entries(GLSL_PRESETS).map(([id, preset]) => ({ id, name: preset.name, uniforms: preset.uniforms }));

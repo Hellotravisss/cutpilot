@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cutpilot": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CUTPILOT_ROOT}/scripts/server.mjs"],
+      "env": {
+        "CUTPILOT_CLIENT": "claude-code"
+      }
+    }
+  }
+}

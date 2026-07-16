@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import { mkdirSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
+import { activeTimeline, applyTimelineEdit, loadProject, newProject, saveProject, validateProject } from "../scripts/project-store.mjs";
+import { createBin } from "../scripts/asset-library-engine.mjs";
+import { createSnapshot, editorHistoryStatus, listSnapshots, redoProject, undoProject } from "../scripts/version-engine.mjs";
+
+const root = resolve(process.argv[2] || "/tmp/mycut-undo-redo"); rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true }); const projectPath = `${root}/history.mycut.json`;
+const project = newProject({ name: "Version 0", width: 320, height: 180, fps: 25 }); project.assets.push({ id: "image", path: `${root}/not-rendered.png`, name: "Still", type: "image", duration: null }); saveProject(projectPath, project); assert.equal(editorHistoryStatus(projectPath).undoCount, 0);
+project.name = "Version 1"; project.history.push({ at: new Date().toISOString(), action: "rename_project" }); saveProject(projectPath, project);
+const bin = createBin(project, { name: "Footage" }); saveProject(projectPath, project);
+applyTimelineEdit(project, { trackName: "V1", adds: [{ assetId: "image", start: 0, sourceStart: 0, duration: 2, label: "Still" }] }); saveProject(projectPath, project);
+let status = editorHistoryStatus(projectPath); assert.equal(status.undoCount, 3); assert.equal(status.redoCount, 0); assert.equal(status.nextUndo.action, "edit_timeline");
+let result = undoProject(projectPath); assert.equal(activeTimeline(result.project).tracks.find((track) => track.name === "V1").items.length, 0); assert.equal(result.status.redoCount, 1);
+result = undoProject(projectPath); assert.equal(result.project.bins.length, 0); assert.equal(result.project.name, "Version 1"); assert.equal(result.status.undoCount, 1); assert.equal(result.status.redoCount, 2);
+result = redoProject(projectPath); assert.equal(result.project.bins[0].id, bin.id); assert.equal(result.status.undoCount, 2); assert.equal(result.status.redoCount, 1); assert.equal(validateProject(result.project).valid, true);
+const reloaded = loadProject(projectPath).project; reloaded.name = "Branched Edit"; reloaded.history.push({ at: new Date().toISOString(), action: "branch_rename" }); saveProject(projectPath, reloaded); status = editorHistoryStatus(projectPath); assert.equal(status.redoCount, 0); assert.throws(() => redoProject(projectPath), /Nothing to redo/); assert.equal(undoProject(projectPath).project.name, "Version 1"); assert.equal(redoProject(projectPath).project.name, "Branched Edit");
+const named = createSnapshot(projectPath, "manual milestone"); assert.equal(listSnapshots(projectPath).some((entry) => entry.id === named.id), true);
+let capped = loadProject(projectPath).project; for (let index = 0; index < 105; index++) { capped.history.push({ at: new Date().toISOString(), action: `step_${index}` }); capped.sequenceCounter = index; saveProject(projectPath, capped); } status = editorHistoryStatus(projectPath); assert.equal(status.undoCount, 100); assert.equal(status.limit, 100);
+console.log(JSON.stringify({ ok: true, projectPath, status, namedSnapshot: named.id, currentName: loadProject(projectPath).project.name }, null, 2));

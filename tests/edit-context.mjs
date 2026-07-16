@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { activeTimeline, applyTimelineEdit, newProject, saveProject } from "../scripts/project-store.mjs";
+import { clearEditContext, readEditContext, resolveEditContext, setEditContext } from "../scripts/edit-context-engine.mjs";
+
+const root = resolve(process.argv[2] || "/tmp/mycut-edit-context");
+rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true });
+const projectPath = `${root}/context.mycut.json`, media = `${root}/source.mp4`; writeFileSync(media, "fixture");
+const project = newProject({ name: "Context", width: 320, height: 180, fps: 30 });
+project.assets.push({ id: "source", path: media, name: "Interview", type: "video", duration: 5, width: 320, height: 180, hasAudio: true, tags: ["person"], transcript: { cues: [{ start: 0, end: 2, text: "hello world", words: [{ start: 0, end: .8, text: "hello " }, { start: 1, end: 1.8, text: "world" }] }] } });
+applyTimelineEdit(project, { trackName: "V1", adds: [{ assetId: "source", start: 0, duration: 5, sourceStart: 0, label: "Base" }] });
+applyTimelineEdit(project, { trackName: "V2", adds: [{ assetId: "source", start: 1, duration: 2, sourceStart: 1, label: "Overlay", transform: { x: 220, y: 10, width: 80, height: 80 } }] });
+const timeline = activeTimeline(project), base = timeline.tracks.find(t => t.name === "V1").items[0], overlay = timeline.tracks.find(t => t.name === "V2").items[0];
+timeline.captions = { enabled: true, style: {}, cues: [{ start: 1, end: 2, text: "caption" }] }; timeline.markers.push({ id: "mark", time: 1.5, label: "beat" }); saveProject(projectPath, project);
+const references = [{ type: "asset", assetId: "source" }, { type: "item", itemId: overlay.id }, { type: "time", time: 1.5 }, { type: "region", x: .7, y: 0, width: .25, height: .5, units: "normalized", time: 1.5 }, { type: "transcript", assetId: "source", start: .5, end: 1.5 }];
+let context = setEditContext(projectPath, project, [...references, references[0]]); assert.equal(context.references.length, 5); assert.equal(readEditContext(projectPath).references.length, 5);
+const result = resolveEditContext(projectPath, project); assert.equal(result.resolved.length, 5); assert.match(result.promptContext, /asset @Interview/); assert.equal(result.resolved[1].item.id, overlay.id);
+assert.deepEqual(result.resolved[2].items.map(entry => entry.item.id).sort(), [base.id, overlay.id].sort()); assert.equal(result.resolved[2].caption.text, "caption"); assert.equal(result.resolved[2].markers[0].id, "mark");
+assert.deepEqual(result.resolved[3].items.map(entry => entry.item.id).sort(), [base.id, overlay.id].sort()); assert.equal(result.resolved[4].text, "hello world");
+context = setEditContext(projectPath, project, [{ type: "item", itemId: base.id }], { mode: "append" }); assert.equal(context.references.length, 6);
+assert.throws(() => setEditContext(projectPath, project, [{ type: "asset", assetId: "missing" }]), /Asset not found/); assert.throws(() => setEditContext(projectPath, project, [{ type: "time", time: 9 }]), /outside timeline/); assert.throws(() => setEditContext(projectPath, project, [{ type: "region", x: .9, y: 0, width: .2, height: .2 }]), /within 0-1/); assert.throws(() => setEditContext(projectPath, project, [{ type: "transcript", assetId: "source", start: 2, end: 1 }]), /Invalid transcript/);
+assert.equal(clearEditContext(projectPath).references.length, 0); assert.equal(readEditContext(projectPath).references.length, 0);
+console.log(JSON.stringify({ ok: true, referenceTypes: references.map(reference => reference.type), promptContext: result.promptContext }, null, 2));

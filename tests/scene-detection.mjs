@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { newProject, saveProject, validateProject } from "../scripts/project-store.mjs";
+import { analyzeAssetScenes, buildSceneRanges, listAssetSubclips, parseSceneTimes, placeAssetSubclip, saveSceneSubclips } from "../scripts/scene-detection-engine.mjs";
+import { renderProject } from "../scripts/media-engine.mjs";
+
+const root = resolve(process.argv[2] || "/tmp/mycut-scene-detection");
+rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true });
+const source = `${root}/hard-cuts.mp4`, output = `${root}/scene-two.mp4`, projectPath = `${root}/scenes.mycut.json`;
+const run = (command, args) => { const result = spawnSync(command, args, { encoding: "utf8" }); if (result.status !== 0) throw new Error(result.stderr); return result.stdout; };
+run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=red:s=320x180:r=24:d=1", "-f", "lavfi", "-i", "color=blue:s=320x180:r=24:d=1", "-f", "lavfi", "-i", "color=green:s=320x180:r=24:d=1", "-filter_complex", "[0:v][1:v][2:v]concat=n=3:v=1:a=0[v]", "-map", "[v]", "-c:v", "libx264", "-pix_fmt", "yuv420p", source]);
+assert.deepEqual(parseSceneTimes("pts_time:1 foo pts_time:2"), [1, 2]);
+assert.deepEqual(buildSceneRanges([.2, 1, 1.2, 2, 2.8], 3, .5).map(range => [range.start, range.end]), [[0, 1], [1, 2], [2, 3]]);
+const project = newProject({ name: "Scenes", width: 320, height: 180, fps: 24 });
+const asset = { id: "hard", path: source, name: "Hard cuts", type: "video", duration: 3, width: 320, height: 180, hasAudio: false };
+project.assets.push(asset); saveProject(projectPath, project);
+const analysis = analyzeAssetScenes(projectPath, asset, { threshold: .2, minScene: .5, thumbnailWidth: 240 });
+assert.equal(analysis.scenes.length, 3); assert.ok(Math.abs(analysis.cutTimes[0] - 1) < .05 && Math.abs(analysis.cutTimes[1] - 2) < .05); assert.ok(analysis.scenes.every(scene => existsSync(scene.thumbnailPath))); assert.equal(existsSync(analysis.contactSheetPath), true);
+analysis.scenes[1].name = "Blue detail"; analysis.scenes[1].tags = ["blue", "middle"]; analysis.scenes[1].annotation = "Solid blue frame";
+const saved = saveSceneSubclips(project, asset.id, analysis.scenes); assert.equal(saved.subclips.length, 3); assert.equal(listAssetSubclips(project, asset.id, "middle").subclips[0].name, "Blue detail");
+const placed = placeAssetSubclip(project, { assetId: asset.id, subclipId: analysis.scenes[1].id, trackIdOrName: "V1", mode: "append" }); assert.ok(Math.abs(placed.item.sourceStart - 1) < .05); assert.ok(Math.abs(placed.item.duration - 1) < .05); assert.equal(validateProject(project).valid, true);
+renderProject(project, output); const frame = `${root}/scene-two.png`; run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-ss", "0.5", "-i", output, "-frames:v", "1", frame]); const mean = run("magick", [frame, "-format", "%[fx:mean.r],%[fx:mean.g],%[fx:mean.b]", "info:"]).trim().split(",").map(Number); assert.ok(mean[2] > mean[0] * 2 && mean[2] > mean[1] * 2);
+assert.throws(() => saveSceneSubclips(project, asset.id, [{ sourceStart: 2, sourceEnd: 4 }]), /Invalid/); assert.throws(() => placeAssetSubclip(project, { assetId: asset.id, subclipId: "missing", trackIdOrName: "V1" }), /not found/);
+console.log(JSON.stringify({ ok: true, cutTimes: analysis.cutTimes, scenes: analysis.scenes.map(scene => ({ name: scene.name, start: scene.sourceStart, end: scene.sourceEnd, thumbnailPath: scene.thumbnailPath })), contactSheetPath: analysis.contactSheetPath, output, blueMean: mean }, null, 2));

@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { applyTimelineEdit, newProject } from "../scripts/project-store.mjs";
+import { probeOutput, renderProject } from "../scripts/media-engine.mjs";
+
+const root = resolve(process.argv[2] || "/tmp/mycut-time-remap"); rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true });
+const run = (command, args) => { const result = spawnSync(command, args, { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }); if (result.status) throw new Error(result.stderr); };
+const video = `${root}/source.mp4`, audio = `${root}/chirp.wav`, output = `${root}/remap.mp4`;
+run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=240x136:r=20:d=4", "-c:v", "libx264", "-pix_fmt", "yuv420p", video]);
+run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc=sin(2*PI*(180*t+120*t*t)):s=48000:d=4", "-c:a", "pcm_s16le", audio]);
+const project = newProject({ name: "Time remap", width: 240, height: 136, fps: 20 }); project.assets.push({ id: "v", path: video, name: "source", type: "video", duration: 4, width: 240, height: 136 }, { id: "a", path: audio, name: "chirp", type: "audio", duration: 4 });
+applyTimelineEdit(project, { trackName: "V1", adds: [{ assetId: "v", start: 0, sourceStart: 0, duration: 1, label: "2x", playbackRate: 2 }, { assetId: "v", start: 1, sourceStart: 2, duration: 1, label: "reverse", playbackRate: 1, reverse: true }, { assetId: "v", start: 2, sourceStart: 3, duration: 1, label: "freeze", playbackRate: 1, freezeFrame: true }] });
+applyTimelineEdit(project, { trackName: "A1", adds: [{ assetId: "a", start: 0, sourceStart: 0, duration: 1, label: "audio 2x", playbackRate: 2 }, { assetId: "a", start: 1, sourceStart: 2, duration: 1, label: "audio reverse", playbackRate: 1, reverse: true }] });
+const result = renderProject(project, output, { crf: 16 }), probe = probeOutput(output); assert.ok(Number(probe.format.duration) >= 2.9); assert.ok(probe.streams.some((stream) => stream.codec_type === "audio"));
+const times = [0.2, 0.8, 1.15, 1.85, 2.15, 2.75], frames = times.map((at, index) => { const path = `${root}/frame-${index}.rgb`; run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-ss", String(at), "-i", output, "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", path]); return path; }), hashes = frames.map((path) => createHash("sha256").update(readFileSync(path)).digest("hex"));
+assert.notEqual(hashes[0], hashes[1]); assert.notEqual(hashes[2], hashes[3]);
+const freezeA = readFileSync(frames[4]), freezeB = readFileSync(frames[5]); let freezeError = 0; for (let index = 0; index < freezeA.length; index++) freezeError += Math.abs(freezeA[index] - freezeB[index]); freezeError /= freezeA.length; assert.ok(freezeError < 0.1, `freeze mean pixel error ${freezeError}`);
+console.log(JSON.stringify({ result, probe, frames, times, hashes, freezeMeanPixelError: freezeError }, null, 2));

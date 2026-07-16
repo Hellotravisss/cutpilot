@@ -1,0 +1,28 @@
+import assert from "node:assert/strict";
+import { mkdirSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { newProject, validateProject } from "../scripts/project-store.mjs";
+import { analyzeMulticamSync, applyMulticamCut, applyMulticamSync, planMulticamCut, planSpeakerMulticamCut } from "../scripts/multicam-engine.mjs";
+
+const root = resolve(process.argv[2] || "/tmp/cutpilot-multicam"); rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true });
+const run = (args) => { const result = spawnSync("ffmpeg", args, { encoding: "utf8" }); if (result.status) throw new Error(result.stderr); };
+const make = (name, delay) => { const path = `${root}/${name}.mp4`; run(["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=0x18202b:s=160x90:r=10:d=6", "-f", "lavfi", "-i", `aevalsrc=if(lt(t\\,${delay})\\,0\\,0.35*sin(2*PI*(300+90*(t-${delay}))*t)+if(lt(mod(t-${delay}\\,0.73)\\,0.08)\\,0.55\\,0)):s=1000:d=6`, "-shortest", "-c:v", "libx264", "-c:a", "aac", path]); return path; };
+const project = newProject({ name: "Multicam", width: 160, height: 90, fps: 10 });
+project.assets.push({ id: "cam-a", name: "Camera A", path: make("a", .4), type: "video", duration: 6, hasAudio: true, annotation: { quality: .9, motion: .2 } }, { id: "cam-b", name: "Camera B", path: make("b", 1.4), type: "video", duration: 6, hasAudio: true, annotation: { quality: .82, motion: .85 } });
+const analysis = analyzeMulticamSync(project, { assetIds: ["cam-a", "cam-b"], referenceAssetId: "cam-a", maxOffsetSeconds: 2, analysisSeconds: 6 });
+assert.ok(Math.abs(analysis.offsets.find((entry) => entry.assetId === "cam-b").offsetSeconds - 1) < .08, JSON.stringify(analysis));
+assert.equal(analysis.offsets.find((entry) => entry.assetId === "cam-b").sourceStart, 1);
+const synced = applyMulticamSync(project, analysis, { includeAudio: true, replace: true }); assert.equal(synced.created.length, 2);
+const plan = planMulticamCut(project, analysis, { start: 0, end: 4.8, pace: "dynamic", preferredAssetIds: ["cam-a"], holds: [{ assetId: "cam-b", start: 2, end: 3, reason: "speaker close-up" }] });
+assert.equal(plan.nonMutating, true); assert.ok(plan.switches.length >= 3); assert.ok(plan.switches.some((entry) => entry.assetId === "cam-b" && entry.start <= 2 && entry.end >= 3)); assert.equal(Number(Object.values(plan.coverage).reduce((sum, value) => sum + value, 0).toFixed(3)), 4.8);
+assert.ok(plan.switches.filter((entry) => entry.reason !== "speaker close-up").every((entry) => entry.end - entry.start >= 1.19), JSON.stringify(plan.switches));
+const speakerTranscript = { cues: [{ start: 0, end: 2.3, speaker: "HOST", text: "Welcome" }, { start: 1.5, end: 3, speaker: "GUEST", text: "Thanks" }, { start: 3, end: 4.8, speaker: "HOST", text: "Next question" }] };
+const speakerPlan = planSpeakerMulticamCut(project, analysis, { transcript: speakerTranscript, speakerCameraMap: { HOST: "cam-a", GUEST: "cam-b" }, overlapAssetId: "cam-a", start: 0, end: 4.8, pace: "balanced" });
+assert.equal(speakerPlan.mode, "speaker-aware"); assert.deepEqual(speakerPlan.speakers, ["HOST", "GUEST"]); assert.equal(speakerPlan.unmappedSpeakers.length, 0); assert.ok(speakerPlan.directedHolds.some((entry) => entry.reason.includes("overlap"))); assert.ok(speakerPlan.switches.some((entry) => entry.assetId === "cam-b"));
+assert.ok(speakerPlan.directedHolds.every((entry) => entry.end - entry.start >= .599));
+assert.equal(speakerPlan.switches.length, 3); assert.equal(speakerPlan.switches[0].end, 2.3);
+assert.throws(() => planSpeakerMulticamCut(project, analysis, { transcript: { cues: [{ start: 0, end: 1, text: "No label" }] }, speakerCameraMap: { HOST: "cam-a" } }), /no speaker-labeled cues/);
+const cut = applyMulticamCut(project, analysis, { replace: true, switches: plan.switches });
+assert.equal(cut.segments.length, plan.switches.length); const directed = cut.segments.find((entry) => entry.assetId === "cam-b" && entry.start === 2); assert.equal(directed.sourceStart, 3); assert.equal(validateProject(project).valid, true);
+console.log(JSON.stringify({ analysis, synced: synced.created, plan, speakerPlan, cut: cut.segments }, null, 2));

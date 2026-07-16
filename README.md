@@ -1,0 +1,90 @@
+# CutPilot
+
+CutPilot is a local-first AI video editing engine designed to be controlled by Codex, Claude, or any MCP-compatible AI host. The AI can inspect footage, propose reviewable edits, modify a real multitrack project, open an embedded timeline, and render locally while the user keeps control of source media and every edit decision.
+
+## Highlights
+
+- 202 MCP tools and nine project starters.
+- Multitrack video/audio timelines, linked A/V, trimming, splitting, ripple operations, snapping, markers, keyframes, effects, transitions, captions, Undo/Redo, and background exports.
+- Local transcription, transcript editing, silence detection, scene detection, beat analysis, duplicate-shot review, proxy media, and smart reframing.
+- Automatic asset understanding using FFmpeg evidence and Apple Vision semantic labels on macOS. Person identity is never inferred.
+- Review-first natural-language edits for speed, volume, captions, mute, deletion, fades, dissolves, scale, exposure, saturation, and track locking. Open-ended creative intent is decomposed by the connected AI host.
+- Vlog, talking-head, podcast, wedding, product-promo, explainer, and motion-graphics director workflows.
+- SVG and JSX/React motion graphics, WebGL shaders, concurrent shader batches, and real Remotion 4 project rendering.
+- FCPXML, Premiere XML, EDL, SRT/VTT/ASS, and a safe CapCut/Jianying continuation bundle.
+- Local procedural media and macOS voice generation plus configurable OpenAI, Seedance, Kling, Mureka, SFX, and generic HTTP bridges.
+
+## What CutPilot is
+
+CutPilot is an MCP editing backend with an embedded manual review interface. It is not intended to replace a traditional desktop editor for every hand operation. Codex or Claude can direct the edit, and the user can open CutPilot's local interface to adjust the timeline, captions, effects, audio, and motion graphics.
+
+Original media stays local unless the user explicitly selects a remote generation or transcription provider.
+
+## Requirements
+
+- macOS
+- Node.js 18 or newer
+- FFmpeg and FFprobe
+- Google Chrome
+- ImageMagick for the local image generator
+- Xcode command-line tools for Apple Vision classification
+
+For Homebrew users:
+
+```bash
+brew install ffmpeg imagemagick
+xcode-select --install
+```
+
+## Run from source
+
+```bash
+npm install
+npm run validate
+node scripts/server.mjs
+```
+
+Example MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "cutpilot": {
+      "command": "node",
+      "args": ["/absolute/path/to/cutpilot/scripts/server.mjs"]
+    }
+  }
+}
+```
+
+Ready-made examples for Codex, Claude Code, and Claude Desktop are included in the repository.
+
+## Safety model
+
+- Natural-language mutations are planned first and require explicit approval.
+- Destructive actions are marked in the plan.
+- Dependency installation for external Remotion projects requires approval; lifecycle scripts are disabled by default.
+- Apple Vision may classify scenes and count detected humans/faces, but CutPilot does not identify people.
+- Modern Jianying/CapCut encrypted drafts have no public write protocol. CutPilot provides read-only detection and an editable media/subtitle/timecode handoff rather than claiming decryption.
+- Paid generation models require the user's own account, endpoint, authorization, and billing.
+
+Run the live readiness audit through the MCP tool `audit_runtime_readiness` to see what is actually available on the current machine.
+
+## Validation
+
+```bash
+npm run test:core
+npm run test:browser
+```
+
+The tests exercise real FFmpeg media, Apple Vision, natural-language plans, the embedded browser UI, Remotion rendering, generation jobs, CapCut handoff, WebGL batch rendering, and MCP startup.
+
+## Current external boundaries
+
+- Commercial generation providers are only live after credentials and endpoints are configured.
+- Direct writing of modern proprietary encrypted Jianying drafts remains experimental.
+- Open-ended creative instructions require an AI host such as Codex or Claude.
+
+## License
+
+No open-source license has been granted yet. The source is publicly visible, but reuse and redistribution remain reserved unless a license is added later.

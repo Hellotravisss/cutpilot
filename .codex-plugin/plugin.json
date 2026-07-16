@@ -1,0 +1,19 @@
+{
+  "name": "cutpilot-ai-editor",
+  "version": "9.1.0",
+  "description": "Local-first AI video editing tools for Codex",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "CutPilot",
+    "shortDescription": "Let Codex inspect footage, plan cuts, and render locally.",
+    "longDescription": "A local-first AI video editing plugin. Codex understands narration and footage, authors an editable JSON cut plan, and renders with FFmpeg without uploading originals.",
+    "developerName": "Travis Zhang",
+    "category": "Creative",
+    "capabilities": ["Codex-embedded deep review UI", "First-class track lifecycle visibility mute lock ordering and snapping", "Editable aspect ratio canvas and export resolution FPS overrides", "Persistent 100-step undo redo journal", "Hierarchical asset bins search and missing-media relinking", "Transcript segment reorder and delete editing", "Multiple editable sequences and In Out zones", "Standalone transparent ProRes 4444 Motion Graphics export", "Premiere XML and expanded FCPXML import", "Advanced EQ dynamics de-esser stereo and pitch", "Chroma key and feathered shape masks", "Color grading curves and vignette", "Editable curve speed ramps and reverse", "True local WebGL GLSL effects", "Visual eased keyframe curves", "Split trim razor ripple and gap editing", "Real audio waveforms", "Eleven production transition types", "Local media inspection", "Semantic shot ranking", "Script-based speech editing", "AI-authored multitrack editing", "Local transcription", "Captions", "Denoise and audio ducking", "Direct-authored SVG Motion Graphics", "Editable keyframe animation", "Persistent generation jobs", "OpenAI image and named Seedance Kling Mureka SFX bridges", "Local voice generation", "Generated media provenance", "Project snapshots and rollback", "Visual QA", "FCPXML Premiere XML and EDL interchange", "Local rendering"],
+    "defaultPrompt": "Use CutPilot to inspect my local footage, understand my narration, propose a dense cut, and render only after I approve the plan."
+  },
+  "mcpServers": "./.mcp.json"
+}

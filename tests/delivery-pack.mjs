@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+import { mkdirSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createDeliveryVariants, submitDeliveryPack } from "../scripts/delivery-pack-engine.mjs";
+import { applyTimelineEdit, loadProject, newProject, saveProject } from "../scripts/project-store.mjs";
+import { readExportJob } from "../scripts/export-job-engine.mjs";
+
+const root = resolve(process.argv[2] || "/tmp/cutpilot-delivery-pack");
+rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true });
+const media = `${root}/source.mp4`, projectPath = `${root}/delivery.cutpilot.json`;
+const ffmpeg = spawnSync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=orange:s=320x180:r=24:d=1", "-c:v", "libx264", "-pix_fmt", "yuv420p", media], { encoding: "utf8" });
+if (ffmpeg.status) throw new Error(ffmpeg.stderr);
+const project = newProject({ name: "Delivery Test", width: 320, height: 180, fps: 24 });
+project.assets.push({ id: "source", name: "source.mp4", path: media, type: "video", duration: 1, width: 320, height: 180 });
+applyTimelineEdit(project, { trackName: "V1", adds: [{ assetId: "source", start: 0, sourceStart: 0, duration: 1, label: "Source" }] });
+const originalActive = project.activeTimelineId;
+const variants = createDeliveryVariants(project, { variants: ["youtube", "shorts", "square", "feed"] });
+assert.equal(variants.created.length, 4); assert.equal(project.activeTimelineId, originalActive);
+assert.deepEqual(variants.created.map((entry) => [entry.key, entry.width, entry.height]), [["youtube",1920,1080],["shorts",1080,1920],["square",1080,1080],["feed",1080,1350]]);
+assert.equal(new Set(project.timelines.flatMap((timeline) => timeline.tracks.map((track) => track.id))).size, project.timelines.reduce((sum, timeline) => sum + timeline.tracks.length, 0));
+assert.equal(createDeliveryVariants(project, { variants: ["square"] }).reused.length, 1);
+saveProject(projectPath, project);
+const square = project.timelines.find((timeline) => timeline.deliveryVariant?.key === "square");
+const submitted = submitDeliveryPack(projectPath, { outputFolder: `${root}/exports`, timelineIds: [square.id], resolution: "480p", frameRate: 24, burnCaptions: false });
+assert.equal(submitted.jobs.length, 1); assert.equal(submitted.timelines[0].variant, "square");
+let job = submitted.jobs[0];
+for (let attempt = 0; attempt < 200 && !["completed", "failed"].includes(job.status); attempt++) { await new Promise((done) => setTimeout(done, 50)); job = readExportJob(projectPath, job.id); }
+assert.equal(job.status, "completed", job.error); assert.deepEqual([job.result.probe.streams[0].width, job.result.probe.streams[0].height], [480, 480]);
+const saved = loadProject(projectPath).project; assert.equal(saved.activeTimelineId, originalActive);
+console.log(JSON.stringify({ ok: true, variants: variants.created, export: { status: job.status, outputPath: job.outputPath, width: 480, height: 480 } }, null, 2));

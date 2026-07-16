@@ -1,0 +1,14 @@
+node_modules/
+outputs/
+work/
+.cutpilot-glsl-batch/
+.mycut-jobs/
+mycut-assets/
+*.mcpb
+*.dxt
+*.zip
+.DS_Store
+.env
+.env.*
+!.env.example
+npm-debug.log*

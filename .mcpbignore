@@ -1,0 +1,7 @@
+tests/
+outputs/
+work/
+.codex-plugin/
+codex.mcp.json
+skills/
+claude/

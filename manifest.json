@@ -1,0 +1,31 @@
+{
+  "manifest_version": "0.3",
+  "name": "cutpilot",
+  "display_name": "CutPilot",
+  "version": "9.1.0",
+  "description": "Local-first AI video editing for Claude Desktop",
+  "long_description": "CutPilot lets Claude inspect local footage, author and revise multitrack edits, clean speech, manage captions and motion graphics, detect duplicate shots, open a local review timeline, and render or export without uploading original media.",
+  "author": {
+    "name": "Travis Zhang"
+  },
+  "icon": "assets/cutpilot-logo.png",
+  "server": {
+    "type": "node",
+    "entry_point": "scripts/server.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/scripts/server.mjs"],
+      "env": {
+        "CUTPILOT_CLIENT": "claude-desktop"
+      }
+    }
+  },
+  "tools_generated": true,
+  "keywords": ["video", "editing", "ffmpeg", "captions", "motion-graphics", "local-first"],
+  "compatibility": {
+    "platforms": ["darwin"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}
