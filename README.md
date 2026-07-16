@@ -1,5 +1,7 @@
 # CutPilot 10
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 CutPilot is a local-first AI video editing engine designed to be controlled by Codex, Claude, or any MCP-compatible AI host. The AI can inspect footage, propose reviewable edits, modify a real multitrack project, open an embedded timeline, and render locally while the user keeps control of source media and every edit decision.
 
 Version 10 adds a persistent project-wide semantic asset index, a review-first cross-category Director Agent, and a durable background task center with cancellation, retry, and restart recovery. It matches narration beats to exact local source ranges, avoids repeated shots, and writes only approved plans to an editable timeline.
