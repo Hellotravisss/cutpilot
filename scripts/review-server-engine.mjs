@@ -45,6 +45,9 @@ import { analyzeAssetIntelligence, applyAssetIntelligence } from "./asset-intell
 import { applyNaturalLanguageEdit, planNaturalLanguageEdit } from "./natural-language-edit-engine.mjs";
 import { exportCapCutHandoff } from "./capcut-handoff-engine.mjs";
 import { inspectGenerationProviders } from "./generation-job-engine.mjs";
+import { buildSemanticIndex, semanticIndexStatus } from "./semantic-index-engine.mjs";
+import { applyDirectorAgentPlan, planDirectorAgent } from "./director-agent-engine.mjs";
+import { cancelBackgroundTask, listBackgroundTasks, retryBackgroundTask, submitBackgroundTask } from "./task-center-engine.mjs";
 
 const sessions = new Map();
 let server = null;
@@ -58,7 +61,7 @@ const body = async (request) => { let raw = ""; for await (const chunk of reques
 function publicState(session) {
   const { project } = loadProject(session.projectPath);
   const timeline = activeTimeline(project);
-  return { project: { ...project, assets: project.assets.map(({ path, sourcePath, ...asset }) => ({ ...asset, proxy: asset.proxy ? { ...asset.proxy, path: undefined, status: proxyStatus({ ...asset, path, proxy: asset.proxy }).status } : undefined, online: existsSync(path) })) }, timeline, duration: projectDuration(timeline), previewUrl: session.previewPath ? `/media?token=${session.token}&preview=1` : null, snapshots: null, editContext: readEditContext(session.projectPath), exportJobs: listExportJobs(session.projectPath).slice(0, 20) };
+  return { project: { ...project, assets: project.assets.map(({ path, sourcePath, ...asset }) => ({ ...asset, proxy: asset.proxy ? { ...asset.proxy, path: undefined, status: proxyStatus({ ...asset, path, proxy: asset.proxy }).status } : undefined, online: existsSync(path) })) }, timeline, duration: projectDuration(timeline), previewUrl: session.previewPath ? `/media?token=${session.token}&preview=1` : null, snapshots: null, editContext: readEditContext(session.projectPath), exportJobs: listExportJobs(session.projectPath).slice(0, 20), backgroundTasks: listBackgroundTasks(session.projectPath).slice(0, 20), semanticIndex: semanticIndexStatus(session.projectPath, project) };
 }
 
 function streamFile(request, response, path) {
@@ -84,6 +87,12 @@ function applyReviewEdit(session, operation) {
   if (operation.kind === "natural-edit-plan") { return{...publicState(session),naturalEditPlan:planNaturalLanguageEdit(project,{instruction:operation.instruction,itemIds:operation.itemIds||[],trackIds:operation.trackIds||[],scope:operation.scope||"selection"})}; }
   if (operation.kind === "natural-edit-apply") { const draft=structuredClone(project),result=applyNaturalLanguageEdit(draft,operation.plan,{approved:operation.approved===true});createSnapshot(session.projectPath,"review-natural-language-edit");saveProject(session.projectPath,draft);return{...publicState(session),appliedNaturalEdit:result}; }
   if (operation.kind === "generation-provider-status") return{...publicState(session),generationProviders:inspectGenerationProviders()};
+  if (operation.kind === "semantic-index-build") return { ...publicState(session), builtSemanticIndex: buildSemanticIndex(session.projectPath, project) };
+  if (operation.kind === "director-agent-plan") return { ...publicState(session), directorAgentPlan: planDirectorAgent(session.projectPath, project, operation.options || {}) };
+  if (operation.kind === "director-agent-apply") { const draft = structuredClone(project), result = applyDirectorAgentPlan(draft, operation.plan, { approved: operation.approved === true, targetTrackName: operation.targetTrackName || "V2 · AI Director", replaceTargetTrack: operation.replaceTargetTrack === true }); createSnapshot(session.projectPath, "review-director-agent"); saveProject(session.projectPath, draft); return { ...publicState(session), appliedDirectorAgent: result }; }
+  if (operation.kind === "background-task-submit") return { ...publicState(session), submittedBackgroundTask: submitBackgroundTask(session.projectPath, { kind: operation.taskKind, options: operation.options || {} }) };
+  if (operation.kind === "background-task-cancel") return { ...publicState(session), cancelledBackgroundTask: cancelBackgroundTask(session.projectPath, operation.taskId) };
+  if (operation.kind === "background-task-retry") return { ...publicState(session), retriedBackgroundTask: retryBackgroundTask(session.projectPath, operation.taskId) };
   if (operation.kind === "capcut-handoff-export") { const name=String(project.name||"cutpilot").replace(/[^\w.\-\u4e00-\u9fff]+/g,"-").slice(0,80),result=exportCapCutHandoff(project,join(dirname(session.projectPath),"exports",`${name}-capcut-handoff`),{copyMedia:true});return{...publicState(session),capcutHandoff:result}; }
   if (operation.kind === "select-video-type") { const draft = structuredClone(project), result = selectVideoType(draft, operation.typeId, operation.setup || {}); createSnapshot(session.projectPath, "review-select-video-type"); saveProject(session.projectPath, draft); return { ...publicState(session), selectedVideoType: result.videoType }; }
   if (operation.kind === "vlog-coverage") return { ...publicState(session), vlogCoverage: analyzeVlogCoverage(project) };

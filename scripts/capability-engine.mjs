@@ -3,6 +3,9 @@ const capabilities = Object.freeze([
   { id:"timeline",category:"editing",label:"多轨时间线与精剪",status:"complete",detail:"多时间线、音视频轨、源监视器、插入/覆盖、链接、分割、修剪、Ripple、吸附、撤销/重做" },
   { id:"speech",category:"ai-editing",label:"语音与文本剪辑",status:"complete",detail:"本地转录、逐词时间、停顿检测、文字稿重排、短语定位、字幕生成" },
   { id:"asset-intelligence",category:"ai-editing",label:"自动素材理解",status:"complete",detail:"FFmpeg 技术/画面/响度/场景证据加 Apple Vision 语义标签和非身份人物/人脸数量，形成可审核标签与精确素材子片段" },
+  { id:"semantic-index",category:"ai-editing",label:"持久语义素材库",status:"complete",detail:"项目级索引覆盖素材、精确子片段和转录区间，自动识别过期状态，支持中英文语义扩展与重复镜头惩罚" },
+  { id:"director-agent",category:"ai-editing",label:"全局 Director Agent",status:"complete",detail:"从简报或字幕拆分故事节拍，跨类型匹配精确本地镜头，先审后写入独立可编辑轨道与标记" },
+  { id:"background-task-center",category:"workflow",label:"后台任务中心",status:"complete",detail:"持久非阻塞任务具备进度、取消、重试、关联历史和宿主重启后的中断恢复" },
   { id:"natural-language-edit",category:"ai-editing",label:"AI 自然语言修改",status:"complete",detail:"内置中英文速度、音量、字幕、静音、删除、淡入淡出、溶解、缩放、曝光、饱和度和轨道锁定；开放意图由宿主 AI 拆成可审核工具计划" },
   { id:"vlog-director",category:"ai-editing",label:"Vlog 全流程导演",status:"complete",detail:"故事、配画、节奏、声音、包装、MG、总检与严格导出门" },
   { id:"category-directors",category:"ai-editing",label:"七类 AI 导演闭环",status:"complete",detail:"Vlog、口播、播客、婚礼、产品广告、解说与纯 MG 均有方案、应用、审核、渲染、统一验收和严格导出门" },
@@ -23,5 +26,5 @@ const capabilities = Object.freeze([
 ]);
 
 export function listCapabilities() { return capabilities.map((entry)=>({ ...entry })); }
-export function capabilitySummary() { const entries=listCapabilities(),counts=Object.fromEntries(["complete","configured","experimental","planned"].map((status)=>[status,entries.filter((entry)=>entry.status===status).length])); return { type:"cutpilot-capability-matrix",version:6,counts,total:entries.length,entries }; }
+export function capabilitySummary() { const entries=listCapabilities(),counts=Object.fromEntries(["complete","configured","experimental","planned"].map((status)=>[status,entries.filter((entry)=>entry.status===status).length])); return { type:"cutpilot-capability-matrix",version:7,counts,total:entries.length,entries }; }
 export function listCapabilityGaps() { const entries=listCapabilities().filter((entry)=>entry.status!=="complete"); return { type:"cutpilot-capability-gaps",gaps:entries,blocking:entries.filter((entry)=>entry.status==="planned"),externalConfiguration:entries.filter((entry)=>entry.status==="configured"),experimental:entries.filter((entry)=>entry.status==="experimental") }; }

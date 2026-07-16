@@ -12,8 +12,8 @@ CutPilot is a local-first, Codex-first editing workflow with an embedded manual 
 1. Call `inspect_media_folder` on the user-provided folder. Do not upload originals.
 2. Read the returned manifest and inspect the generated contact-sheet images when visual selection matters.
 3. Identify the narration file from the user's naming or instruction. Ask only for creative choices that cannot be inferred.
-4. Inspect contact sheets, then call `annotate_assets` with factual visual descriptions and tags. Do not guess unseen content.
-5. Use `rank_assets_for_narration` for each narration beat. Pass already-used asset IDs in `avoidAssetIds` when the user wants less repetition.
+4. Inspect contact sheets, then call `annotate_assets` with factual visual descriptions and tags. Do not guess unseen content. Build `build_semantic_index` after substantial asset changes.
+5. Prefer `search_semantic_assets` for exact asset, scene-subclip, and transcript ranges. Pass already-used asset IDs in `avoidAssetIds` when the user wants less repetition. Use `rank_assets_for_narration` only as a lightweight fallback.
 6. Author a cut plan with frequent, semantically matched shots. Each visual clip needs a source path, timeline start, source start, and duration. Never repeat a shot unless the user asks or the repetition has a clear editorial purpose.
 7. Summarize the proposed structure and obtain approval before expensive rendering unless the user explicitly asked to run end-to-end.
 8. Call `render_project` after approval. Deliver the MP4 plus the JSON project.
@@ -115,7 +115,10 @@ Use `find_transcript_phrase` to prove the exact source range before phrase-speci
 - Use `export_capcut_editable_handoff` for the dependable CutPilot-to-CapCut/Jianying route: source media, editable UTF-8 SRT captions, EDL timing, FCPXML, Premiere XML, and a full JSON track manifest. `inspect_capcut_draft` is read-only. Never claim that a non-JSON modern private draft was decrypted or made directly writable.
 - Use `render_glsl_batch` for independent concurrent WebGL renders. Keep concurrency within local memory/GPU limits, inspect every per-job result, and do not equate local parallel workers with a remote GPU cluster.
 
-## Current v9.1 capabilities
+## Current v10 capabilities
+
+- `plan_director_agent` creates a cross-category, non-mutating beat plan from timeline captions or a user brief. Always show gaps and obtain explicit approval before `apply_director_agent`.
+- Long-running index, director-plan, and runtime-audit work can use the persistent task center. Read task state, cancel on request, retry only terminal tasks, and use recovery after an interrupted host session.
 
 - Seven director workflows share one evidence-based acceptance audit for online media, review gates, editable timelines, variants, export settings, and strict release readiness.
 - Multi-platform delivery packs derive independent editable 16:9, 9:16, 1:1, and 4:5 timelines and submit background exports that are pinned to each exact sequence.

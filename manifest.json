@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "cutpilot",
   "display_name": "CutPilot",
-  "version": "9.1.0",
+  "version": "10.0.0",
   "description": "Local-first AI video editing for Claude Desktop",
   "long_description": "CutPilot lets Claude inspect local footage, author and revise multitrack edits, clean speech, manage captions and motion graphics, detect duplicate shots, open a local review timeline, and render or export without uploading original media.",
   "author": {
