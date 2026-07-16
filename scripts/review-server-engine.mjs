@@ -48,6 +48,8 @@ import { inspectGenerationProviders } from "./generation-job-engine.mjs";
 import { buildSemanticIndex, semanticIndexStatus } from "./semantic-index-engine.mjs";
 import { applyDirectorAgentPlan, planDirectorAgent } from "./director-agent-engine.mjs";
 import { cancelBackgroundTask, listBackgroundTasks, retryBackgroundTask, submitBackgroundTask } from "./task-center-engine.mjs";
+import { readAiSettings, saveAiSettings, testAiConnection } from "./ai-provider-engine.mjs";
+import { planIndependentAi } from "./independent-agent-engine.mjs";
 
 const sessions = new Map();
 let server = null;
@@ -61,7 +63,7 @@ const body = async (request) => { let raw = ""; for await (const chunk of reques
 function publicState(session) {
   const { project } = loadProject(session.projectPath);
   const timeline = activeTimeline(project);
-  return { project: { ...project, assets: project.assets.map(({ path, sourcePath, ...asset }) => ({ ...asset, proxy: asset.proxy ? { ...asset.proxy, path: undefined, status: proxyStatus({ ...asset, path, proxy: asset.proxy }).status } : undefined, online: existsSync(path) })) }, timeline, duration: projectDuration(timeline), previewUrl: session.previewPath ? `/media?token=${session.token}&preview=1` : null, snapshots: null, editContext: readEditContext(session.projectPath), exportJobs: listExportJobs(session.projectPath).slice(0, 20), backgroundTasks: listBackgroundTasks(session.projectPath).slice(0, 20), semanticIndex: semanticIndexStatus(session.projectPath, project) };
+  return { project: { ...project, assets: project.assets.map(({ path, sourcePath, ...asset }) => ({ ...asset, proxy: asset.proxy ? { ...asset.proxy, path: undefined, status: proxyStatus({ ...asset, path, proxy: asset.proxy }).status } : undefined, online: existsSync(path) })) }, timeline, duration: projectDuration(timeline), previewUrl: session.previewPath ? `/media?token=${session.token}&preview=1` : null, snapshots: null, editContext: readEditContext(session.projectPath), exportJobs: listExportJobs(session.projectPath).slice(0, 20), backgroundTasks: listBackgroundTasks(session.projectPath).slice(0, 20), semanticIndex: semanticIndexStatus(session.projectPath, project), aiSettings: readAiSettings() };
 }
 
 function streamFile(request, response, path) {
@@ -76,10 +78,21 @@ function streamFile(request, response, path) {
   } else { response.writeHead(200, { "content-type": mime(path), "content-length": size, "accept-ranges": "bytes" }); createReadStream(path).pipe(response); }
 }
 
-function applyReviewEdit(session, operation) {
+async function applyReviewEdit(session, operation) {
   if (operation.kind === "undo") { undoProject(session.projectPath); return publicState(session); }
   if (operation.kind === "redo") { redoProject(session.projectPath); return publicState(session); }
   const { project } = loadProject(session.projectPath);
+  if (operation.kind === "ai-settings-save") return { ...publicState(session), aiSettings: saveAiSettings(operation.settings || {}) };
+  if (operation.kind === "ai-settings-test") return { ...publicState(session), aiConnection: await testAiConnection() };
+  if (operation.kind === "independent-ai-plan") return { ...publicState(session), independentAiPlan: await planIndependentAi(session.projectPath, project, operation.options || {}) };
+  if (operation.kind === "independent-ai-apply") {
+    if (operation.approved !== true) throw new Error("Independent AI plan requires explicit approval");
+    const wrapper = operation.plan, draft = structuredClone(project); let result;
+    if (wrapper.intent === "director") result = applyDirectorAgentPlan(draft, wrapper.plan, { approved: true, targetTrackName: "V2 · AI Director", replaceTargetTrack: operation.replaceTargetTrack !== false });
+    else if (wrapper.intent === "revise") result = applyNaturalLanguageEdit(draft, wrapper.plan, { approved: true });
+    else throw new Error("This AI request is advisory and has no automatic mutation");
+    createSnapshot(session.projectPath, "independent-ai-apply"); saveProject(session.projectPath, draft); return { ...publicState(session), appliedIndependentAi: result };
+  }
   if (operation.kind === "context-add") { setEditContext(session.projectPath, project, [operation.reference], { mode: "append" }); return publicState(session); }
   if (operation.kind === "context-clear") { clearEditContext(session.projectPath); return publicState(session); }
   if (operation.kind === "asset-intelligence-analyze") { const asset=project.assets.find((entry)=>entry.id===operation.assetId);if(!asset)throw new Error(`Asset not found: ${operation.assetId}`);return{...publicState(session),assetIntelligenceAnalysis:analyzeAssetIntelligence(session.projectPath,asset,operation.options||{})}; }
@@ -299,7 +312,7 @@ async function handler(request, response) {
   if (!session) return json(response, 403, { error: "Invalid or expired review token" });
   try {
     if (url.pathname === "/api/project" && request.method === "GET") return json(response, 200, publicState(session));
-    if (url.pathname === "/api/edit" && request.method === "POST") return json(response, 200, applyReviewEdit(session, await body(request)));
+    if (url.pathname === "/api/edit" && request.method === "POST") return json(response, 200, await applyReviewEdit(session, await body(request)));
     if (url.pathname === "/media" && request.method === "GET") {
       if (url.searchParams.get("preview") === "1") return streamFile(request, response, session.previewPath);
       const assetId = url.searchParams.get("assetId"); const { project } = loadProject(session.projectPath); const asset = project.assets.find((entry) => entry.id === assetId); if (!asset) return json(response, 404, { error: "Asset not found" }); const media = resolvePreviewMedia(asset, { preferProxy: url.searchParams.get("proxy") === "1" }); response.setHeader("x-mycut-media", media.usingProxy ? "proxy" : "original"); return streamFile(request, response, media.path);

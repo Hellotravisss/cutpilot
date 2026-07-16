@@ -52,7 +52,7 @@ try {
         heading,
       );
       const panel = await page.$eval("#panel", (element) => element.textContent);
-      assert.match(panel, /CutPilot 9\.1 统一验收/);
+      assert.match(panel, /CutPilot 10 统一验收/);
       assert.equal(errors.length, 0, `${type}: ${errors.join("; ")}`);
       results.push({ type, heading, acceptance: true });
       if (proof && type === "motion-graphics") await page.screenshot({ path: proof, fullPage: true });

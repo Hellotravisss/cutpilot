@@ -3,8 +3,8 @@
   "name": "cutpilot",
   "display_name": "CutPilot",
   "version": "10.0.0",
-  "description": "Local-first AI video editing for Claude Desktop",
-  "long_description": "CutPilot lets Claude inspect local footage, author and revise multitrack edits, clean speech, manage captions and motion graphics, detect duplicate shots, open a local review timeline, and render or export without uploading original media.",
+  "description": "Local-first AI video editing with standalone, Codex, Claude, and MCP modes",
+  "long_description": "CutPilot can run independently or through Codex, Claude, and compatible MCP hosts. It understands local footage, plans reviewable edits, authors multitrack timelines, cleans speech, manages captions and motion graphics, and renders locally.",
   "author": {
     "name": "Travis Zhang"
   },

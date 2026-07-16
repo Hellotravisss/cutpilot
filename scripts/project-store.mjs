@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { playbackSourceSpan, validateSpeedCurve } from "./speed-curve-engine.mjs";
@@ -6,28 +6,72 @@ import { validateEffectStack } from "./visual-effects-engine.mjs";
 import { validateAudioEffectStack } from "./audio-effects-engine.mjs";
 import { validateAssetLibrary } from "./asset-library-engine.mjs";
 import { recordProjectChange } from "./version-engine.mjs";
+import { CURRENT_PROJECT_SCHEMA, migrateProject } from "./project-integrity-engine.mjs";
+
+const wait = (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+const backupPath = (path) => `${path}.bak`;
+const lockPath = (path) => `${path}.lock`;
+
+function withProjectLock(path, action, { timeoutMs = 5000, staleMs = 30000 } = {}) {
+  const lock = lockPath(path), started = Date.now();
+  while (true) {
+    try { mkdirSync(lock); break; }
+    catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      try { if (Date.now() - statSync(lock).mtimeMs > staleMs) { rmSync(lock, { recursive: true, force: true }); continue; } } catch {}
+      if (Date.now() - started >= timeoutMs) throw new Error(`Project is busy: ${path}`);
+      wait(25);
+    }
+  }
+  try { return action(); } finally { rmSync(lock, { recursive: true, force: true }); }
+}
+
+function parseProject(path) {
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  return migrateProject(parsed);
+}
 
 export function loadProject(projectPath) {
   const path = resolve(projectPath);
   if (!existsSync(path)) throw new Error(`Project not found: ${path}`);
-  return { path, project: JSON.parse(readFileSync(path, "utf8")) };
+  try {
+    const result = parseProject(path);
+    return { path, project: result.project, migration: result.migrated ? result : null, recovered: false };
+  } catch (error) {
+    const backup = backupPath(path);
+    if (!existsSync(backup)) throw new Error(`Project is unreadable and no backup is available: ${error.message}`);
+    const result = parseProject(backup), corrupt = `${path}.corrupt-${Date.now()}`;
+    renameSync(path, corrupt);
+    copyFileSync(backup, path);
+    return { path, project: result.project, migration: result.migrated ? result : null, recovered: true, corruptPath: corrupt };
+  }
 }
 
 export function saveProject(projectPath, project) {
   const path = resolve(projectPath);
   mkdirSync(dirname(path), { recursive: true });
-  const previous = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
-  project.updatedAt = new Date().toISOString();
-  recordProjectChange(path, previous, project);
-  writeFileSync(path, JSON.stringify(project, null, 2));
-  return path;
+  return withProjectLock(path, () => {
+    const previous = existsSync(path) ? parseProject(path).project : null;
+    const migrated = migrateProject(project).project;
+    if (previous && migrated.revision !== previous.revision) throw new Error(`Project changed in another process: expected revision ${migrated.revision}, found ${previous.revision}. Reload before saving.`);
+    migrated.revision = (previous?.revision || 0) + 1;
+    migrated.updatedAt = new Date().toISOString();
+    Object.assign(project, migrated);
+    recordProjectChange(path, previous, migrated);
+    if (existsSync(path)) copyFileSync(path, backupPath(path));
+    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    try { writeFileSync(temporary, JSON.stringify(migrated, null, 2)); JSON.parse(readFileSync(temporary, "utf8")); renameSync(temporary, path); }
+    finally { rmSync(temporary, { force: true }); }
+    return path;
+  });
 }
 
 export function newProject({ name, width, height, fps }) {
   const timelineId = randomUUID();
   const now = new Date().toISOString();
   return {
-    schemaVersion: 2,
+    schemaVersion: CURRENT_PROJECT_SCHEMA,
+    revision: 0,
     id: randomUUID(),
     name,
     createdAt: now,
