@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "validate": "node --check scripts/server.mjs && node tests/runtime-readiness.mjs && node tests/capabilities.mjs && node tests/site.mjs",
+    "validate": "node --check scripts/server.mjs && node --check site/auth.js && node tests/accounts-integration.mjs && node tests/runtime-readiness.mjs && node tests/capabilities.mjs && node tests/site.mjs",
     "test:core": "node tests/asset-intelligence.mjs && node tests/semantic-director.mjs && node tests/task-center.mjs && node tests/natural-language-edit.mjs && node tests/generation-providers.mjs && node tests/capcut-handoff.mjs && node tests/glsl-batch.mjs && node tests/remotion-project.mjs && node tests/mcp-smoke.mjs",
     "test:browser": "node tests/intelligence-natural-ui.mjs && node tests/director-panels-ui.mjs && node tests/delivery-pack-ui.mjs",
     "test:product": "node tests/project-integrity.mjs && node tests/independent-ai.mjs && node tests/project-scale.mjs",
